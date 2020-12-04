@@ -49,11 +49,11 @@ def get_data(data, N_calibrate , N_validation):
     X_data = defaultdict(defaultdict)
     Y_data = defaultdict(defaultdict)
     # calibrate
-    X_data['calibrate']['raw'] = data.iloc[:N_calibrate,list(range(0,10)) + list(range(11,data.shape[1]))]
-    Y_data['calibrate']['raw'] = data.iloc[:N_calibrate,10]
+    X_data['calibrate']['processed'] = data.iloc[:N_calibrate,list(range(0,10)) + list(range(11,data.shape[1]))]
+    Y_data['calibrate']['processed'] = data.iloc[:N_calibrate,10]
     # validation
-    X_data['validation']['raw'] = data.iloc[N_calibrate:,list(range(0,10)) + list(range(11,data.shape[1]))]
-    Y_data['validation']['raw'] = data.iloc[N_calibrate:,10]   
+    X_data['validation']['processed'] = data.iloc[N_calibrate:,list(range(0,10)) + list(range(11,data.shape[1]))]
+    Y_data['validation']['processed'] = data.iloc[N_calibrate:,10]   
     
     return X_data,Y_data
 
