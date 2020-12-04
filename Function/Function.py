@@ -39,44 +39,23 @@ def inital_model(inputs,optimizer = 'adam',loss='mean_squared_error'):
     autoencoder.compile(optimizer=optimizer, loss=loss)
     return autoencoder
 
-def get_data(days, valid):
+def get_data(data, N_calibrate , N_validation):
 
-    stock_lp = pd.read_csv(join(current_folder , 'Data/SP_500_clean.csv') , index_col = 0)
-    pct =  pd.read_csv(join(current_folder , 'Data/SP_500_pct_change.csv')  , index_col = 0)
-    net =  pd.read_csv(   join(current_folder , 'Data/SP_500_net_change.csv')   , index_col = 0)
-    spy_full = pd.read_csv(   join(current_folder , 'Data/SP_500_index.csv') , index_col=0).astype('float32')
-    spy_net = pd.read_csv(join(current_folder , 'Data/SP_500_index_net_change.csv'), index_col=0).astype('float32')
-    spy_percentage = pd.read_csv(join(current_folder , 'Data/SP_500_index_pct_change.csv') , index_col=0).astype('float32')
+    data = data
+    # number for calibrate and validation
+    N_calibrate = int( N_calibrate * data.shape[0])
 
-
-
-    stock = defaultdict(defaultdict)
-    spy = defaultdict(defaultdict)
-
-    stock['calibrate']['lp'] = stock_lp.iloc[0:days, :]
-    stock['validate']['lp'] = stock_lp.iloc[days:days + valid, :]
-
-
-    stock['calibrate']['percentage'] = pct.iloc[:days,:] *100
-    stock['validate']['percentage'] = pct.iloc[days:days+valid,:] *100
-
-
-    stock['calibrate']['net'] = net.iloc[0:days,:]
-    stock['validate']['net'] = net.iloc[days:days+valid,:]
-
-
-
-    spy['calibrate']['lp'] = spy_full[:days]
-    spy['validate']['lp'] = spy_full[days:days+valid]
-
-
-    spy['calibrate']['net'] = spy_net[:days]
-    spy['validate']['net'] = spy_net[days:days+valid]
-
-
-    spy['calibrate']['percentage'] = spy_percentage[:days] * 100
-    spy['validate']['percentage'] = spy_percentage[days:days+valid] *100
-    return stock,spy
+    # store and classify data using defaultdict
+    X_data = defaultdict(defaultdict)
+    Y_data = defaultdict(defaultdict)
+    # calibrate
+    X_data['calibrate']['raw'] = data.iloc[:N_calibrate,list(range(0,10)) + list(range(11,data.shape[1]))]
+    Y_data['calibrate']['raw'] = data.iloc[:N_calibrate,10]
+    # validation
+    X_data['validation']['raw'] = data.iloc[N_calibrate:,list(range(0,10)) + list(range(11,data.shape[1]))]
+    Y_data['validation']['raw'] = data.iloc[N_calibrate:,10]   
+    
+    return X_data,Y_data
 
 # In[ ]:
 
