@@ -39,21 +39,21 @@ def inital_model(inputs,optimizer = 'adam',loss='mean_squared_error'):
     autoencoder.compile(optimizer=optimizer, loss=loss)
     return autoencoder
 
-def get_data(data, N_calibrate , N_validation):
+def get_data(X,Y, N_calibrate , N_validation):
 
-    data = data
+
     # number for calibrate and validation
-    N_calibrate = int( N_calibrate * data.shape[0])
+    N_calibrate = int( N_calibrate * X.shape[0])
 
     # store and classify data using defaultdict
     X_data = defaultdict(defaultdict)
     Y_data = defaultdict(defaultdict)
     # calibrate
-    X_data['calibrate']['processed'] = data.iloc[:N_calibrate,list(range(0,10)) + list(range(11,data.shape[1]))]
-    Y_data['calibrate']['processed'] = data.iloc[:N_calibrate,10]
+    X_data['calibrate']['processed'] = X.iloc[:N_calibrate,:]
+    Y_data['calibrate']['processed'] = Y.iloc[:N_calibrate]
     # validation
-    X_data['validation']['processed'] = data.iloc[N_calibrate:,list(range(0,10)) + list(range(11,data.shape[1]))]
-    Y_data['validation']['processed'] = data.iloc[N_calibrate:,10]   
+    X_data['validation']['processed'] = X.iloc[N_calibrate:,:]
+    Y_data['validation']['processed'] = Y.iloc[N_calibrate:]
     
     return X_data,Y_data
 
