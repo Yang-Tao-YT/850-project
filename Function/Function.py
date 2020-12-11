@@ -21,7 +21,18 @@ import yfinance
 from collections import defaultdict
 from os.path import abspath,join
 current_folder = abspath('');current_folder
-def mse_compare_batch(X_df , Y_df, X_validation_df , Y_validation_df , ranking):
+def mse_compare(X_df , Y_df, X_validation_df , Y_validation_df , ranking):
+    '''
+    calculate and compare the mse of linear regression and pca prediction
+    Also, compare the mse of both under the different number of X factors, reduced by autoencoder
+    input:
+        X_df ,
+        Y_df,
+        X_validation_df ,
+        Y_validation_df ,
+        ranking from autoencoder
+    output: mse_compare dataframe
+    '''
     # number of factors that is used to do regression
     n_factors = [*range(10,len(X_df.columns)//2 + 1, 1)] [::-1]
     # store mse of different method with different number of factors
@@ -71,36 +82,45 @@ def mse_compare_batch(X_df , Y_df, X_validation_df , Y_validation_df , ranking):
     mse_df = pd.DataFrame(mse , index = n_factors)
     return mse_df
 def inital_model(inputs,optimizer = 'adam',loss='mean_squared_error'):
-    
-    ######### connecting all layers ????
+    '''
+    construct autoencoder neural network
+    output: autoencoder nerual network
+    '''
     # input layer
     input_img = Input(shape=(inputs, ))
     # encoding layer ( we need to figure out how many layers we need and how many nodes for each layer)
     encoded = Dense(128, activation='relu', kernel_regularizer=regularizers.l2(0.01))(input_img)#1
-    # do we need all these layer?
     encoded = Dense(64, activation='relu',kernel_regularizer=regularizers.l2(0.01))(encoded)#3
     encoded = Dense(32,activation='relu',kernel_regularizer=regularizers.l2(0.01))(encoded)#3
     decoded = Dense(64, activation='relu',kernel_regularizer=regularizers.l2(0.01))(encoded)#4
     decoded = Dense(128, activation='relu',kernel_regularizer=regularizers.l2(0.01))(decoded)#5
     decoded = Dense(inputs, activation= 'linear', kernel_regularizer=regularizers.l2(0.01))(decoded) #6
-
     ######### construct and compile 
     autoencoder = Model(input_img, decoded)
-    # we need to figure out what is the best loss function and optimizer function.
-    # so far adam is the most popular one on the market
+    # dam is the one of most popular one on the market
     autoencoder.compile(optimizer=optimizer, loss=loss)
     return autoencoder
 
-def get_data(X,Y, P_calibrate ,batch = 10,fraq = 0.8):
-
+def get_data(X,Y, P_calibrate ,batch = 10,frac = 0.8 , shuffle = False):
+    '''
+    store and classify data into calibration and validation; batch shuffle data into different batch;
+    input:
+        X data and Y data ,
+        frac: fraction of data that a batch contain  (0.8 means batch only contain 80% of total data)
+        shuffle: whether to shuffle whole data
+    output: defaultdict contains data for calibration and validation
+    '''
     ori_data = pd.concat([X,Y] ,axis = 1)
     data = ori_data
     # number for calibrate and validation
     N_calibrate = int( P_calibrate * X.shape[0])
-    batch_N_calibrate = int(N_calibrate * fraq)
+    batch_N_calibrate = int(N_calibrate * frac)
     # store and classify data using defaultdict
     X_data = defaultdict(defaultdict)
     Y_data = defaultdict(defaultdict)
+    # store the total df (shuffle == False)
+    if shuffle == True:
+        data = data.sample(frac = 1)
     X_data['calibrate']['processed']  = data.iloc[:N_calibrate,:-1]
     Y_data['calibrate']['processed']  = data.iloc[:N_calibrate,-1]
     X_data['validation']['processed']  = data.iloc[N_calibrate:,:-1]
@@ -109,9 +129,9 @@ def get_data(X,Y, P_calibrate ,batch = 10,fraq = 0.8):
     # -1 indicate negative returns, 1 indicate positive returns
     Y_data['calibrate']['direction'] = [-1 if i < 0 else 1 for i in Y_data['calibrate']['processed'] ]
     Y_data['validation']['direction'] = [-1 if i < 0 else 1 for i in Y_data['validation']['processed'] ]
-
-    for key in range(batch): # batch shuffle
-        temp_data = ori_data.sample(frac = fraq)
+    # batch shuffle
+    for key in range(batch):
+        temp_data = ori_data.sample(frac = frac)
         # calibrate
         X_data['calibrate']['processed_batch{}'.format(key)] = temp_data.iloc[:batch_N_calibrate,:-1]
         Y_data['calibrate']['processed_batch{}'.format(key)]  = temp_data.iloc[:batch_N_calibrate,-1]
@@ -145,9 +165,14 @@ def inital_model_portfolio(inputs,optimizer = 'sgd', loss = 'mean_squared_error'
 
 
 def process_nan(data,method = 'dropna' ):
+    '''
+    clean the dataframe for na with different method
+    output:
+        cleaned dataframe
+    '''
     if method == 'dropna':
         # dropna and set batch size to 2000
-        data = data.dropna()  ;frac = 2000/data.shape[0]
+        data = data.dropna()  ;frac = 1
     elif method == 'fillna_0_after_normalization':
         # normalization then fill na with 0 and set batch size to 3000
         data = pd.concat([(data.iloc[:,:-1] - data.iloc[:,:-1].min())/(data.iloc[:,:-1].max() - data.iloc[:,:-1].min()),data.iloc[:,-1]],axis = 1) ; data = data.fillna(0) ;frac = 3000/data.shape[0]
