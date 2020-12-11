@@ -107,8 +107,8 @@ def get_data(X,Y, P_calibrate ,batch = 10,frac = 0.8 , shuffle = False):
     input:
         X data and Y data ,
         frac: fraction of data that a batch contain  (0.8 means batch only contain 80% of total data)
-        shuffle: whether to shuffle whole data
-    output: defaultdict contains data for calibration and validation
+        shuffle: whether to shuffle data
+    output: defaultdict contains batch samples
     '''
     ori_data = pd.concat([X,Y] ,axis = 1)
     data = ori_data
@@ -118,31 +118,51 @@ def get_data(X,Y, P_calibrate ,batch = 10,frac = 0.8 , shuffle = False):
     # store and classify data using defaultdict
     X_data = defaultdict(defaultdict)
     Y_data = defaultdict(defaultdict)
+    X_data['calibrate']['batch_without_shuffle'] = defaultdict(defaultdict)
+    Y_data['calibrate']['batch_without_shuffle'] = defaultdict(defaultdict)
+    X_data['validation']['batch_without_shuffle'] = defaultdict(defaultdict)
+    Y_data['validation']['batch_without_shuffle'] = defaultdict(defaultdict)
+    X_data['calibrate']['batch'] = defaultdict(defaultdict)
+    Y_data['calibrate']['batch'] = defaultdict(defaultdict)
+    X_data['validation']['batch'] = defaultdict(defaultdict)
+    Y_data['validation']['batch'] = defaultdict(defaultdict)
     # store the total df (shuffle == False)
     if shuffle == True:
         data = data.sample(frac = 1)
-    X_data['calibrate']['processed']  = data.iloc[:N_calibrate,:-1]
-    Y_data['calibrate']['processed']  = data.iloc[:N_calibrate,-1]
-    X_data['validation']['processed']  = data.iloc[N_calibrate:,:-1]
-    Y_data['validation']['processed']  = data.iloc[N_calibrate:,-1]
+    X_data['calibrate']['origin']  = data.iloc[:N_calibrate,:-1]
+    Y_data['calibrate']['origin']  = data.iloc[:N_calibrate,-1]
+    X_data['validation']['origin']  = data.iloc[N_calibrate:,:-1]
+    Y_data['validation']['origin']  = data.iloc[N_calibrate:,-1]
     # generate data of returns direction [-1,1]
     # -1 indicate negative returns, 1 indicate positive returns
-    Y_data['calibrate']['direction'] = [-1 if i < 0 else 1 for i in Y_data['calibrate']['processed'] ]
-    Y_data['validation']['direction'] = [-1 if i < 0 else 1 for i in Y_data['validation']['processed'] ]
+    Y_data['calibrate']['direction'] = [-1 if i < 0 else 1 for i in Y_data['calibrate']['origin'] ]
+    Y_data['validation']['direction'] = [-1 if i < 0 else 1 for i in Y_data['validation']['origin'] ]
     # batch shuffle
     for key in range(batch):
         temp_data = ori_data.sample(frac = frac)
         # calibrate
-        X_data['calibrate']['processed_batch{}'.format(key)] = temp_data.iloc[:batch_N_calibrate,:-1]
-        Y_data['calibrate']['processed_batch{}'.format(key)]  = temp_data.iloc[:batch_N_calibrate,-1]
+        X_data['calibrate']['batch']['processed_batch{}'.format(key)] = temp_data.iloc[:batch_N_calibrate,:-1]
+        Y_data['calibrate']['batch']['processed_batch{}'.format(key)]  = temp_data.iloc[:batch_N_calibrate,-1]
         # validation
-        X_data['validation']['processed_batch{}'.format(key)]  = temp_data.iloc[batch_N_calibrate:,:-1]
-        Y_data['validation']['processed_batch{}'.format(key)]  = temp_data.iloc[batch_N_calibrate:,-1]
+        X_data['validation']['batch']['processed_batch{}'.format(key)]  = temp_data.iloc[batch_N_calibrate:,:-1]
+        Y_data['validation']['batch']['processed_batch{}'.format(key)]  = temp_data.iloc[batch_N_calibrate:,-1]
         # generate data of returns direction [-1,1]
         # -1 indicate negative returns, 1 indicate positive returns
-        Y_data['calibrate']['direction_batch{}'.format(key)] = [-1 if i < 0 else 1 for i in Y_data['calibrate']['processed_batch{}'.format(key)] ]
-        Y_data['validation']['direction_batch{}'.format(key)] = [-1 if i < 0 else 1 for i in Y_data['validation']['processed_batch{}'.format(key)] ]
-    
+        Y_data['calibrate']['batch']['direction_batch{}'.format(key)] = [-1 if i < 0 else 1 for i in Y_data['calibrate']['batch']['processed_batch{}'.format(key)] ]
+        Y_data['validation']['batch']['direction_batch{}'.format(key)] = [-1 if i < 0 else 1 for i in Y_data['validation']['batch']['processed_batch{}'.format(key)] ]
+        
+        start = np.random.choice(int((1 - frac) * data.shape[0])) 
+        temp_data = ori_data.iloc[start:start + int(frac * data.shape[0]),:]
+        # calibrate
+        X_data['calibrate']['batch_without_shuffle']['processed_batch{}'.format(key)] = temp_data.iloc[:batch_N_calibrate,:-1]
+        Y_data['calibrate']['batch_without_shuffle']['processed_batch{}'.format(key)]  = temp_data.iloc[:batch_N_calibrate,-1]
+        # validation
+        X_data['validation']['batch_without_shuffle']['processed_batch{}'.format(key)]  = temp_data.iloc[batch_N_calibrate:,:-1]
+        Y_data['validation']['batch_without_shuffle']['processed_batch{}'.format(key)]  = temp_data.iloc[batch_N_calibrate:,-1]
+        # generate data of returns direction [-1,1]
+        # -1 indicate negative returns, 1 indicate positive returns
+        Y_data['calibrate']['batch_without_shuffle']['direction_batch{}'.format(key)] = [-1 if i < 0 else 1 for i in Y_data['calibrate']['batch_without_shuffle']['processed_batch{}'.format(key)] ]
+        Y_data['validation']['batch_without_shuffle']['direction_batch{}'.format(key)] = [-1 if i < 0 else 1 for i in Y_data['validation']['batch_without_shuffle']['processed_batch{}'.format(key)] ]
     return X_data,Y_data
 
 # In[ ]:
@@ -172,7 +192,7 @@ def process_nan(data,method = 'dropna' ):
     '''
     if method == 'dropna':
         # dropna and set batch size to 2000
-        data = data.dropna()  ;frac = 1
+        data = data.dropna()  ;frac = 2000 /data.shape[0]
     elif method == 'fillna_0_after_normalization':
         # normalization then fill na with 0 and set batch size to 3000
         data = pd.concat([(data.iloc[:,:-1] - data.iloc[:,:-1].min())/(data.iloc[:,:-1].max() - data.iloc[:,:-1].min()),data.iloc[:,-1]],axis = 1) ; data = data.fillna(0) ;frac = 3000/data.shape[0]
