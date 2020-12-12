@@ -151,7 +151,7 @@ def get_data(X,Y, P_calibrate ,batch = 10,frac = 0.8 , shuffle = False):
         Y_data['calibrate']['batch']['direction_batch{}'.format(key)] = [-1 if i < 0 else 1 for i in Y_data['calibrate']['batch']['processed_batch{}'.format(key)] ]
         Y_data['validation']['batch']['direction_batch{}'.format(key)] = [-1 if i < 0 else 1 for i in Y_data['validation']['batch']['processed_batch{}'.format(key)] ]
         
-        start = np.random.choice(int((1 - frac) * data.shape[0])) 
+        start = np.random.choice(int((1 - frac) * data.shape[0]))
         temp_data = ori_data.iloc[start:start + int(frac * data.shape[0]),:]
         # calibrate
         X_data['calibrate']['batch_without_shuffle']['processed_batch{}'.format(key)] = temp_data.iloc[:batch_N_calibrate,:-1]
@@ -204,3 +204,15 @@ def process_nan(data,method = 'dropna' ):
         data = data.fillna(data.mean() ,axis = 0) ; frac = 3000/data.shape[0]
     print(data.shape)
     return data,frac
+
+def norml_standard(X_data , m = 'standardlization'):
+    '''
+    normalization or standardlization
+    output: processed dataframe
+    '''
+    #normalization or standardlization
+    if m == 'normalization':
+        X_data = pd.DataFrame(normalize(X_data, axis=1) , columns = X_data.columns , index = X_data.index)
+    elif m == 'standardlization':
+        X_data = pd.DataFrame(StandardScaler().fit_transform(X_data) , columns = X_data.columns , index = X_data.index)
+    return X_data
