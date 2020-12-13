@@ -12,7 +12,7 @@ from keras.models import Model
 from keras import regularizers
 from keras.models import load_model
 from sklearn import preprocessing 
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler , normalize
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
@@ -21,6 +21,8 @@ import yfinance
 from collections import defaultdict
 from os.path import abspath,join
 current_folder = abspath('');current_folder
+def mse_compare(X_df , Y_df, X_validation_df , Y_validation_df , ranking):
+
 def mse_compare(X_df , Y_df, X_validation_df , Y_validation_df , ranking):
     '''
     calculate and compare the mse of linear regression and pca prediction
@@ -31,26 +33,34 @@ def mse_compare(X_df , Y_df, X_validation_df , Y_validation_df , ranking):
         X_validation_df ,
         Y_validation_df ,
         ranking from autoencoder
-    output: mse_compare dataframe
+    output: mse_df,r_squre_df , trained model_pca, trained model_lg
     '''
     # number of factors that is used to do regression
-    n_factors = [*range(10,len(X_df.columns)//2 + 1, 1)] [::-1]
+    n_factors = [len(X_df.columns)] + [*range(10,len(X_df.columns)//2 + 1, 1)] [::-1]
     # store mse of different method with different number of factors
     mse_pca_calibration = [] # mean squared errors of pca with calibration data
     mse_pca_validation = [] # mean squared errors of pca with validation data
     mse_lg_calibration = [] # mean squared errors of linear regression with calibration data
     mse_lg_validation = [] # mean squared errors of linear regression with validation data
+    r_squre_pca_calibration = [] # r squared of pca with calibration data
+    r_squre_pca_validation = [] # r squared of pca with validation data
+    r_squre_lg_calibration = [] # r squared of linear regression with calibration data
+    r_squre_lg_validation = [] # r squared of linear regression with validation data
     for k in n_factors:
         # index of factors
-        # the top k factors combined with bottom k factors
-        index = list(X_df.columns[ranking[:k]]) + \
-                     list(X_df.columns[ranking[-k:]])
+        # the top k factors combined with bottom k//s factors
+        s = k+1
+        if k == len(X_df.columns): # the first k include all factors
+            index = X_df.columns
+        else:
+            index = list(X_df.columns[ranking[:k]]) + \
+                     list(X_df.columns[ranking[-k//s:]])
         # get X data
         data = X_df.loc[:,index]
 
 
         # using pca in LinearRegression
-        X = data
+        X = np.array(data)
         y = np.array(Y_df)
         pca = PCA(n_components=5) #initial model
         X_pca = pca.fit_transform(X) # pca decomposition
@@ -60,6 +70,7 @@ def mse_compare(X_df , Y_df, X_validation_df , Y_validation_df , ranking):
 
         # record mse
         mse_pca_calibration.append(mean_squared_error(model_pca.predict(X_pca),y))
+
         # out of sample-validation
         # get validation X data and Y data
         X_test =  np.array(X_validation_df.loc[:,index])
@@ -68,19 +79,29 @@ def mse_compare(X_df , Y_df, X_validation_df , Y_validation_df , ranking):
 
         # record mse(validation)
         mse_pca_validation.append(mean_squared_error(model_pca.predict(X_test_pca),y_test))
-
+        # record r score
+        r_squre_pca_calibration.append(model_pca.score(X_pca,y))
+        r_squre_pca_validation.append(model_pca.score(X_test_pca,y_test))
         ## compare with the performance of linear regression without PCA
 
-        model = LinearRegression()# initial predicition model
-        model.fit(X,y) # fit model
+        model_lg = LinearRegression()# initial predicition model
+        model_lg.fit(X,y) # fit model
         # record mse
-        mse_lg_calibration.append(mean_squared_error(model.predict(X),y))
-        mse_lg_validation.append(mean_squared_error(model.predict(X_test),y_test))
+        mse_lg_calibration.append(mean_squared_error(model_lg.predict(X),y))
+        mse_lg_validation.append(mean_squared_error(model_lg.predict(X_test),y_test))
+        # record r squre
+        r_squre_lg_calibration.append(model_lg.score(X,y)) # r squared of linear regression with calibration data
+        r_squre_lg_validation.append(model_lg.score(X_test, y_test)) # r squared of linear regression with validation data
         # present mse
     mse = {'mse_pca_calibration' : mse_pca_calibration, 'mse_pca_validation' : mse_pca_validation, \
                        'mse_lg_calibration' : mse_lg_calibration, 'mse_lg_validation' : mse_lg_validation}
-    mse_df = pd.DataFrame(mse , index = n_factors)
-    return mse_df
+    r_squre = {'r_squre_pca_calibration' : r_squre_pca_calibration,'r_squre_pca_validation' : r_squre_pca_validation,\
+                    'r_squre_lg_calibration' : r_squre_lg_calibration, 'r_squre_lg_validation' : r_squre_lg_validation  }
+    mse_df = pd.DataFrame(mse , index = np.concatenate([[len(X_df.columns)],np.array(n_factors[1:])  +  np.array(n_factors[1:])//s]))
+    r_squre_df = pd.DataFrame(r_squre , index = np.concatenate([[len(X_df.columns)],np.array(n_factors[1:])  +  np.array(n_factors[1:])//s]))
+    return mse_df,r_squre_df , model_pca, model_lg
+
+
 def inital_model(inputs,optimizer = 'adam',loss='mean_squared_error'):
     '''
     construct autoencoder neural network
@@ -216,3 +237,18 @@ def norml_standard(X_data , m = 'standardlization'):
     elif m == 'standardlization':
         X_data = pd.DataFrame(StandardScaler().fit_transform(X_data) , columns = X_data.columns , index = X_data.index)
     return X_data
+
+
+def cut_fat_tail(data, method):
+    '''cut the tail to eliminate the fat tail effect'''
+    if method == methods[0]:
+        right = data.quantile(.995)
+        left =  data.quantile(1 - .995)
+        data = data[~(data > right).any(axis = 1)]
+        data = data[~(data < left).any(axis = 1)]
+    else :
+        right = data.quantile(.95)
+        left =  data.quantile(1 - .95)
+        data = data[~(data > right).any(axis = 1)]
+        data = data[~(data < left).any(axis = 1)]
+    return data
