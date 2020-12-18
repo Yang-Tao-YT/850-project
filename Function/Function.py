@@ -16,13 +16,24 @@ from sklearn.preprocessing import StandardScaler , normalize
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
+import statsmodels.api as sm
 import copy
 import yfinance
 from collections import defaultdict
 from os.path import abspath,join
 current_folder = abspath('');current_folder
-def mse_compare(X_df , Y_df, X_validation_df , Y_validation_df , ranking):
 
+def effective_test (X , y):
+    est = sm.OLS(y, X)
+    est2 = est.fit()
+
+    t_values = pd.DataFrame({'x' : X.columns, 't_value' :  est2.tvalues}).reset_index(drop= True)
+    effective_factors = (t_values[(t_values.t_value < 1.96) & (t_values.t_value > -1.96)])
+    effective_factors.insert(2 , 'abs',np.abs(effective_factors.t_value.values))
+    effective_factors = effective_factors.sort_values(by = 'abs').reset_index(drop= True)
+    return effective_factors
+    
+    
 def mse_compare(X_df , Y_df, X_validation_df , Y_validation_df , ranking):
     '''
     calculate and compare the mse of linear regression and pca prediction
@@ -241,7 +252,7 @@ def norml_standard(X_data , m = 'standardlization'):
 
 def cut_fat_tail(data, method):
     '''cut the tail to eliminate the fat tail effect'''
-    if method == methods[0]:
+    if method == 'dropna':
         right = data.quantile(.995)
         left =  data.quantile(1 - .995)
         data = data[~(data > right).any(axis = 1)]
