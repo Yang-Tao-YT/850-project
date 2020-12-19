@@ -24,6 +24,11 @@ from os.path import abspath,join
 current_folder = abspath('');current_folder
 
 def effective_test (X , y):
+    '''
+    test the effective of factors, using 0.95 confidence level
+    input: X factors, dependend variable y
+    output: effective factors
+    '''
     est = sm.OLS(y, X)
     est2 = est.fit()
 
@@ -31,6 +36,7 @@ def effective_test (X , y):
     effective_factors = (t_values[(t_values.t_value < 1.96) & (t_values.t_value > -1.96)])
     effective_factors.insert(2 , 'abs',np.abs(effective_factors.t_value.values))
     effective_factors = effective_factors.sort_values(by = 'abs').reset_index(drop= True)
+    return effective_factors
     return effective_factors
     
     
